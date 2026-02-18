@@ -1,0 +1,92 @@
+name: "Pipeline: Full Daily Run"
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 6 AM UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-east1' }}
+
+jobs:
+  # ------------------------------------------------------------------
+  # Phase 1a: Trigger Fivetran syncs (QuickBooks, Stripe, Salesforce)
+  # Fivetran handles scheduling natively, but we trigger here to
+  # guarantee data is fresh before the dbt build.
+  # ------------------------------------------------------------------
+  fivetran-sync:
+    name: "Sync: Fivetran Connectors"
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger Fivetran syncs
+        run: |
+          # Trigger each connector and wait for completion
+          for CONNECTOR_ID in ${{ vars.FIVETRAN_QB_CONNECTOR }} ${{ vars.FIVETRAN_STRIPE_CONNECTOR }} ${{ vars.FIVETRAN_SF_CONNECTOR }}; do
+            echo "Triggering Fivetran connector: $CONNECTOR_ID"
+            curl -s -X POST \
+              "https://api.fivetran.com/v1/connectors/$CONNECTOR_ID/force" \
+              -H "Authorization: Basic ${{ secrets.FIVETRAN_API_KEY }}" \
+              -H "Content-Type: application/json"
+          done
+          echo "Fivetran syncs triggered. Connectors will complete independently."
+        continue-on-error: true
+
+  # ------------------------------------------------------------------
+  # Phase 1b: Run custom extractors in parallel (NetSuite, Plaid)
+  # ------------------------------------------------------------------
+  extract:
+    name: "Extract: ${{ matrix.source }}"
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      matrix:
+        source: [netsuite, plaid]
+      fail-fast: false
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Execute Cloud Run Job
+        run: |
+          gcloud run jobs execute extract-${{ matrix.source }} \
+            --region=${{ env.GCP_REGION }} \
+            --wait
+
+  # ------------------------------------------------------------------
+  # Phase 2: Run dbt after all ingestion completes
+  # ------------------------------------------------------------------
+  transform:
+    name: "Transform: dbt Build"
+    needs: [fivetran-sync, extract]
+    if: always() && (needs.extract.result == 'success' || needs.extract.result == 'failure')
+    uses: ./.github/workflows/deploy-dbt.yml
+    secrets: inherit
+
+  # ------------------------------------------------------------------
+  # Phase 3: Summary
+  # ------------------------------------------------------------------
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [fivetran-sync, extract, transform]
+    if: always()
+    steps:
+      - name: Report status
+        run: |
+          echo "## Daily Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Phase | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Fivetran Sync (QB, Stripe, SF) | ${{ needs.fivetran-sync.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Custom Extractors (NS, Plaid)  | ${{ needs.extract.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| dbt Build                      | ${{ needs.transform.result }} |" >> $GITHUB_STEP_SUMMARY

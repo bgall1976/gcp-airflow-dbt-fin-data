@@ -1,0 +1,71 @@
+version: 2
+
+models:
+  - name: stg_quickbooks__invoices
+    description: "Staged QuickBooks invoices with standardized column names and types"
+    columns:
+      - name: invoice_id
+        description: "Primary key"
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: total_amount
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 10000000
+      - name: currency_code
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['USD', 'EUR', 'GBP', 'CAD', 'AUD']
+      - name: payment_status
+        tests:
+          - accepted_values:
+              values: ['paid', 'open', 'overdue']
+
+  - name: stg_quickbooks__payments
+    description: "Staged QuickBooks received payments"
+    columns:
+      - name: payment_id
+        tests:
+          - not_null
+          - unique
+      - name: payment_amount
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+
+  - name: stg_quickbooks__accounts
+    description: "Staged QuickBooks chart of accounts"
+    columns:
+      - name: account_id
+        tests:
+          - not_null
+          - unique
+      - name: account_name
+        tests:
+          - not_null
+      - name: classification
+        tests:
+          - accepted_values:
+              values: ['Asset', 'Equity', 'Expense', 'Liability', 'Revenue']
+
+  - name: stg_quickbooks__customers
+    description: "Staged QuickBooks customer records"
+    columns:
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+      - name: email
+        tests:
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: '^[^@]+@[^@]+\.[^@]+$'
+              config:
+                where: "email is not null"

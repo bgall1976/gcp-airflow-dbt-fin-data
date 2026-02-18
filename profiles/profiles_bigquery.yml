@@ -1,0 +1,25 @@
+financial_data_platform:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth  # or service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: dev_marts
+      threads: 4
+      timeout_seconds: 300
+      location: US
+      priority: interactive
+      retries: 1
+
+    prod:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: marts
+      threads: 8
+      timeout_seconds: 600
+      location: US
+      priority: interactive
+      retries: 3
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"

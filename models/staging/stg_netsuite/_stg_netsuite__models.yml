@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: stg_netsuite__transactions
+    description: "Staged NetSuite transactions, excluding voided entries"
+    columns:
+      - name: transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: transaction_type
+        tests:
+          - not_null
+      - name: total_amount
+        tests:
+          - not_null
+
+  - name: stg_netsuite__accounts
+    description: "Staged NetSuite chart of accounts with unified classification"
+    columns:
+      - name: account_id
+        tests:
+          - not_null
+          - unique
+      - name: classification
+        tests:
+          - accepted_values:
+              values: ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'Other']

@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: int_golden_customers
+    description: >
+      Golden customer record built by resolving entities across Salesforce,
+      QuickBooks, Stripe, and NetSuite. Priority: SF > QB > Stripe.
+    columns:
+      - name: customer_golden_id
+        description: "Deterministic surrogate key for the unified customer"
+        tests:
+          - not_null
+          - unique
+      - name: company_name
+        tests:
+          - not_null
+      - name: email
+        tests:
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: '^[^@]+@[^@]+\.[^@]+$'
+              config:
+                where: "email is not null"
+      - name: primary_source
+        tests:
+          - accepted_values:
+              values: ['salesforce', 'quickbooks', 'stripe']
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+
+  - name: int_unified_chart_of_accounts
+    description: "Canonical chart of accounts merging QuickBooks and NetSuite"
+    columns:
+      - name: account_golden_id
+        tests:
+          - not_null
+          - unique
+      - name: classification
+        tests:
+          - accepted_values:
+              values: ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'Other']
+
+  - name: int_unified_transactions
+    description: >
+      All financial transactions from every source in a common schema.
+      Incremental model partitioned by month.
+    columns:
+      - name: transaction_unified_id
+        tests:
+          - not_null
+          - unique
+      - name: source_system
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['quickbooks', 'stripe', 'netsuite', 'plaid']
+      - name: amount
+        tests:
+          - not_null
+      - name: transaction_date
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "{{ var('min_transaction_date') }}"
+              max_value: "{{ modules.datetime.date.today().isoformat() }}"
+      - name: currency_code
+        tests:
+          - not_null

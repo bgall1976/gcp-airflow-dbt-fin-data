@@ -1,0 +1,26 @@
+# Custom extractor dependencies (NetSuite + Plaid only)
+# QuickBooks, Stripe, Salesforce are ingested via Fivetran
+requests>=2.31.0
+google-cloud-bigquery>=3.14.0
+google-cloud-bigquery-storage>=2.24.0
+google-cloud-secret-manager>=2.18.0
+python-dotenv>=1.0.0
+tenacity>=8.2.3
+pydantic>=2.5.0
+plaid-python>=18.0.0
+
+# dbt
+dbt-core>=1.7.0
+dbt-bigquery>=1.7.0
+
+# Data Quality
+elementary-data[bigquery]>=0.14.0
+
+# Testing & Linting
+pytest>=7.4.0
+sqlfluff>=2.3.0
+ruff>=0.2.0
+
+# Orchestration (optional -- only needed if running Airflow locally)
+# apache-airflow>=2.8.0
+# apache-airflow-providers-google>=10.0.0

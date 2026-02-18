@@ -1,0 +1,38 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir dbt-bigquery==1.7.*
+
+# Copy dbt project files (flat layout)
+COPY dbt_project.yml packages.yml ./
+COPY models/ models/
+COPY macros/ macros/
+COPY seeds/ seeds/
+COPY snapshots/ snapshots/
+COPY tests/ tests/
+
+# Install dbt packages
+RUN dbt deps
+
+RUN mkdir -p /root/.dbt && \
+    echo 'financial_data_platform:\n\
+  target: prod\n\
+  outputs:\n\
+    prod:\n\
+      type: bigquery\n\
+      method: oauth\n\
+      project: "{{ env_var(\"GCP_PROJECT_ID\") }}"\n\
+      dataset: marts\n\
+      threads: 8\n\
+      timeout_seconds: 600\n\
+      location: US\n\
+      priority: interactive\n\
+      retries: 3' > /root/.dbt/profiles.yml
+
+ENTRYPOINT ["dbt"]
+CMD ["build", "--target", "prod"]

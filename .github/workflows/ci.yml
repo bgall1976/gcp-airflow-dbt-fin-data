@@ -1,0 +1,126 @@
+name: "CI: dbt Lint & Test"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'models/**'
+      - 'macros/**'
+      - 'tests/**'
+      - 'dbt_project.yml'
+      - 'extractors/**'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+  id-token: write   # Required for Workload Identity Federation
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-east1' }}
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ------------------------------------------------------------------
+  # Job 1: Lint Python extractors
+  # ------------------------------------------------------------------
+  python-lint:
+    name: Python Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff
+      - run: ruff check extractors/
+
+  # ------------------------------------------------------------------
+  # Job 2: Lint SQL models
+  # ------------------------------------------------------------------
+  sql-lint:
+    name: SQL Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install sqlfluff dbt-bigquery
+      - name: Lint staging models
+        working-directory: .
+        run: sqlfluff lint models/ --dialect bigquery || true
+        # Non-blocking for now; switch to strict once backlog is clean
+
+  # ------------------------------------------------------------------
+  # Job 3: dbt compile + test against dev dataset
+  # ------------------------------------------------------------------
+  dbt-test:
+    name: dbt Compile & Test
+    runs-on: ubuntu-latest
+    needs: [python-lint, sql-lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Install dbt
+        run: pip install dbt-bigquery
+
+      - name: Write dbt profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          financial_data_platform:
+            target: ci
+            outputs:
+              ci:
+                type: bigquery
+                method: oauth
+                project: ${{ vars.GCP_PROJECT_ID }}
+                dataset: ci_${{ github.run_id }}
+                threads: 4
+                timeout_seconds: 300
+                location: US
+                priority: interactive
+                retries: 1
+          EOF
+
+      - name: Install dbt packages
+        working-directory: .
+        run: dbt deps
+
+      - name: Compile project
+        working-directory: .
+        run: dbt compile
+
+      - name: Seed reference data
+        working-directory: .
+        run: dbt seed
+
+      - name: Run modified models + downstream
+        working-directory: .
+        run: dbt build --select state:modified+ --defer --state ./target --fail-fast
+        continue-on-error: true
+
+      - name: Cleanup CI dataset
+        if: always()
+        run: |
+          bq rm -r -f -d ${{ vars.GCP_PROJECT_ID }}:ci_${{ github.run_id }} || true
+
+      - name: Upload dbt artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-ci-artifacts
+          path: |
+            dbt_project/target/run_results.json
+            dbt_project/target/manifest.json
+          retention-days: 7

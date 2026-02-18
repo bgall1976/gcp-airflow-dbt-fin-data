@@ -1,0 +1,28 @@
+[sqlfluff]
+dialect = bigquery
+templater = dbt
+max_line_length = 100
+indent_unit = space
+
+[sqlfluff:indentation]
+indented_joins = false
+indented_using_on = true
+template_tags_indent = true
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.identifiers]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+capitalisation_policy = lower
+
+[sqlfluff:rules:layout.long_lines]
+ignore_comment_lines = true
+
+[sqlfluff:templater:dbt]
+project_dir = .
+profiles_dir = .
+profile = financial_data_platform
+target = dev

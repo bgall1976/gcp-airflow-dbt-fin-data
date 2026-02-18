@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: stg_plaid__transactions
+    description: "Staged Plaid bank transactions with amounts inverted to accounting convention"
+    columns:
+      - name: plaid_transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: amount
+        tests:
+          - not_null
+      - name: transaction_date
+        tests:
+          - not_null
+
+  - name: stg_plaid__balances
+    description: "Staged daily bank balance snapshots from Plaid"
+    columns:
+      - name: plaid_account_id
+        tests:
+          - not_null
+      - name: balance_date
+        tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - plaid_account_id
+            - balance_date

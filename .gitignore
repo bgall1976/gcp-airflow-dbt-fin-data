@@ -1,0 +1,28 @@
+# Environment
+.env
+.venv/
+venv/
+*.pyc
+__pycache__/
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+profiles.yml
+
+# GCP credentials
+*.json
+!dbt_project/seeds/*.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate*

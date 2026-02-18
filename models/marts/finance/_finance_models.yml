@@ -1,0 +1,119 @@
+version: 2
+
+models:
+  - name: fct_transactions
+    description: >
+      Core financial transactions fact table joining unified transactions to
+      golden customer records. Incremental, partitioned by month.
+    columns:
+      - name: transaction_key
+        description: "Primary key - surrogate from unified transaction ID"
+        tests:
+          - not_null
+          - unique
+      - name: customer_key
+        description: "FK to dim_customers"
+        tests:
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_key
+              config:
+                where: "customer_key is not null"
+      - name: amount
+        tests:
+          - not_null
+      - name: transaction_date
+        tests:
+          - not_null
+      - name: source_system
+        tests:
+          - not_null
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          min_value: 1
+          config:
+            severity: warn
+
+  - name: fct_revenue
+    description: "Revenue fact combining recognized revenue and Salesforce pipeline"
+    columns:
+      - name: transaction_key
+        tests:
+          - not_null
+      - name: revenue_amount
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              config:
+                where: "revenue_stage = 'recognized'"
+      - name: revenue_stage
+        tests:
+          - accepted_values:
+              values: ['recognized', 'booked', 'pipeline', 'lost']
+
+  - name: fct_cash_flow
+    description: "Daily cash flow combining bank + accounting data"
+    columns:
+      - name: cash_flow_id
+        tests:
+          - not_null
+          - unique
+      - name: cash_flow_date
+        tests:
+          - not_null
+
+  - name: fct_accounts_receivable
+    description: "AR aging with bucket classification"
+    columns:
+      - name: invoice_id
+        tests:
+          - not_null
+          - unique
+      - name: aging_bucket
+        tests:
+          - accepted_values:
+              values: ['Paid', 'Current', '1-30 Days', '31-60 Days',
+                        '61-90 Days', '90+ Days']
+      - name: total_amount
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: balance_due
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+
+  - name: dim_customers
+    description: "Conformed customer dimension with lifetime metrics"
+    columns:
+      - name: customer_key
+        tests:
+          - not_null
+          - unique
+      - name: company_name
+        tests:
+          - not_null
+      - name: customer_tier
+        tests:
+          - accepted_values:
+              values: ['Enterprise', 'Mid-Market', 'SMB', 'Starter', 'Prospect']
+
+  - name: dim_accounts
+    description: "Conformed chart of accounts dimension"
+    columns:
+      - name: account_key
+        tests:
+          - not_null
+          - unique
+      - name: classification
+        tests:
+          - not_null
+
+  - name: dim_date
+    description: "Standard date dimension 2020-2030"
+    columns:
+      - name: date_key
+        tests:
+          - not_null
+          - unique

@@ -1,0 +1,8 @@
+currency_code,currency_name,symbol,decimal_places
+USD,US Dollar,$,2
+EUR,Euro,€,2
+GBP,British Pound,£,2
+CAD,Canadian Dollar,C$,2
+AUD,Australian Dollar,A$,2
+JPY,Japanese Yen,¥,0
+CHF,Swiss Franc,CHF,2

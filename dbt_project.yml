@@ -1,0 +1,101 @@
+name: 'financial_data_platform'
+version: '1.0.0'
+config-version: 2
+
+profile: 'financial_data_platform'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  # Currency conversion base
+  base_currency: 'USD'
+  # Lookback window for incremental models (days)
+  incremental_lookback: 3
+  # Minimum transaction date to process
+  min_transaction_date: '2020-01-01'
+
+models:
+  financial_data_platform:
+    +materialized: view
+
+    staging:
+      +materialized: view
+      +schema: staging
+      +tags: ['staging']
+      stg_quickbooks:
+        +meta:
+          owner: 'data-engineering'
+          source_system: 'quickbooks'
+      stg_stripe:
+        +meta:
+          owner: 'data-engineering'
+          source_system: 'stripe'
+      stg_netsuite:
+        +meta:
+          owner: 'data-engineering'
+          source_system: 'netsuite'
+      stg_plaid:
+        +meta:
+          owner: 'data-engineering'
+          source_system: 'plaid'
+      stg_salesforce:
+        +meta:
+          owner: 'data-engineering'
+          source_system: 'salesforce'
+
+    vault:
+      +materialized: incremental
+      +schema: vault
+      +tags: ['vault']
+      hubs:
+        +meta:
+          vault_component: hub
+      links:
+        +meta:
+          vault_component: link
+      satellites:
+        +meta:
+          vault_component: satellite
+
+    intermediate:
+      +materialized: table
+      +schema: intermediate
+      +tags: ['intermediate']
+
+    marts:
+      +materialized: table
+      +schema: marts
+      +tags: ['marts']
+      finance:
+        +meta:
+          owner: 'finance-analytics'
+      data_quality:
+        +materialized: table
+        +schema: data_quality
+        +tags: ['data_quality']
+
+seeds:
+  financial_data_platform:
+    +schema: seeds
+    seed_chart_of_accounts:
+      +column_types:
+        account_code: varchar(20)
+    seed_currency_codes:
+      +column_types:
+        currency_code: varchar(3)
+
+snapshots:
+  financial_data_platform:
+    +target_schema: snapshots
+
+on-run-end:
+  - "{{ log_dbt_results(results) }}"

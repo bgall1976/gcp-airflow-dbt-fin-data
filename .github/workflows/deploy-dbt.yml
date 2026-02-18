@@ -1,0 +1,195 @@
+name: "Deploy: dbt Build (Production)"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'models/**'
+      - 'macros/**'
+      - 'seeds/**'
+      - 'snapshots/**'
+      - 'dbt_project.yml'
+      - 'Dockerfile.dbt'
+      - '.github/workflows/deploy-dbt.yml'
+
+  # Daily scheduled run after extractors have finished
+  schedule:
+    - cron: '0 7 * * *'   # 7 AM UTC, after 6 AM extraction
+
+  workflow_dispatch:
+    inputs:
+      full_refresh:
+        description: 'Run dbt with --full-refresh'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      select:
+        description: 'dbt --select filter (blank = all models)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-east1' }}
+  AR_REPO: financial-data-platform
+  IMAGE_NAME: dbt-runner
+
+jobs:
+  # ------------------------------------------------------------------
+  # Build and push the dbt Docker image
+  # ------------------------------------------------------------------
+  build:
+    name: Build dbt Image
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Set image tag
+        id: meta
+        run: echo "tag=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        run: |
+          docker build -f Dockerfile.dbt -t ${{ steps.meta.outputs.tag }} .
+          docker push ${{ steps.meta.outputs.tag }}
+
+  # ------------------------------------------------------------------
+  # Run dbt in production
+  # ------------------------------------------------------------------
+  dbt-run:
+    name: dbt Production Build
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Install dbt
+        run: pip install dbt-bigquery
+
+      - name: Write production profiles.yml
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'EOF'
+          financial_data_platform:
+            target: prod
+            outputs:
+              prod:
+                type: bigquery
+                method: oauth
+                project: ${{ vars.GCP_PROJECT_ID }}
+                dataset: marts
+                threads: 8
+                timeout_seconds: 600
+                location: US
+                priority: interactive
+                retries: 3
+          EOF
+
+      - name: Install dbt packages
+        working-directory: .
+        run: dbt deps
+
+      - name: Check source freshness
+        working-directory: .
+        run: dbt source freshness
+        continue-on-error: true
+
+      - name: Seed reference data
+        working-directory: .
+        run: dbt seed --target prod
+
+      # Build args based on inputs
+      - name: Build dbt command
+        id: dbt_cmd
+        run: |
+          CMD="dbt build --target prod"
+
+          if [ "${{ inputs.full_refresh }}" = "true" ]; then
+            CMD="$CMD --full-refresh"
+          fi
+
+          if [ -n "${{ inputs.select }}" ]; then
+            CMD="$CMD --select ${{ inputs.select }}"
+          fi
+
+          echo "cmd=$CMD" >> "$GITHUB_OUTPUT"
+          echo "Running: $CMD"
+
+      - name: Run dbt build
+        working-directory: .
+        run: ${{ steps.dbt_cmd.outputs.cmd || 'dbt build --target prod' }}
+
+      - name: Run dbt snapshots
+        working-directory: .
+        run: dbt snapshot --target prod
+
+      - name: Generate docs
+        working-directory: .
+        run: dbt docs generate --target prod
+
+      # Upload dbt docs to GCS for hosting
+      - name: Upload docs to GCS
+        run: |
+          gsutil -m cp \
+            target/catalog.json \
+            target/manifest.json \
+            target/index.html \
+            gs://${{ vars.DBT_DOCS_BUCKET }}/
+        continue-on-error: true
+
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-prod-results-${{ github.run_id }}
+          path: |
+            target/run_results.json
+            target/manifest.json
+            target/sources.json
+          retention-days: 30
+
+  # ------------------------------------------------------------------
+  # Notify on failure
+  # ------------------------------------------------------------------
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: dbt-run
+    if: failure()
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "dbt production build FAILED :red_circle:\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true

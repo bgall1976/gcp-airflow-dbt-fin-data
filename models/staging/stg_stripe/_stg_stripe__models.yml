@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_stripe__charges
+    description: "Staged Stripe charges with amounts converted from cents to dollars"
+    columns:
+      - name: charge_id
+        tests:
+          - not_null
+          - unique
+      - name: charge_amount
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: charge_status
+        tests:
+          - accepted_values:
+              values: ['succeeded', 'pending', 'failed']
+
+  - name: stg_stripe__customers
+    description: "Staged Stripe customers with cross-system ID mappings"
+    columns:
+      - name: stripe_customer_id
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_stripe__balance_transactions
+    description: "Staged Stripe balance transactions (the financial ledger)"
+    columns:
+      - name: balance_transaction_id
+        tests:
+          - not_null
+          - unique
+      - name: transaction_type
+        tests:
+          - accepted_values:
+              values: ['charge', 'refund', 'payout', 'adjustment', 'transfer',
+                        'stripe_fee', 'application_fee', 'payment']

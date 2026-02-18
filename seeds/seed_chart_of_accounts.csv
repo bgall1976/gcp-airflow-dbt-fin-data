@@ -1,0 +1,23 @@
+account_code,source_system,canonical_classification,canonical_category,financial_statement_line,is_balance_sheet,is_income_statement
+1000,quickbooks,Asset,Cash and Equivalents,Cash and Cash Equivalents,true,false
+1100,quickbooks,Asset,Accounts Receivable,Accounts Receivable,true,false
+1200,quickbooks,Asset,Other Current Assets,Prepaid Expenses,true,false
+1500,quickbooks,Asset,Fixed Assets,Property and Equipment,true,false
+2000,quickbooks,Liability,Accounts Payable,Accounts Payable,true,false
+2100,quickbooks,Liability,Short-term Debt,Accrued Liabilities,true,false
+2500,quickbooks,Liability,Long-term Debt,Long-term Debt,true,false
+3000,quickbooks,Equity,Equity,Retained Earnings,true,false
+4000,quickbooks,Revenue,Revenue,Revenue,false,true
+4100,quickbooks,Revenue,Other Income,Other Income,false,true
+5000,quickbooks,Expense,Cost of Goods Sold,Cost of Revenue,false,true
+6000,quickbooks,Expense,Operating Expenses,Sales and Marketing,false,true
+6100,quickbooks,Expense,Operating Expenses,General and Administrative,false,true
+6200,quickbooks,Expense,Operating Expenses,Research and Development,false,true
+7000,quickbooks,Expense,Other Expenses,Interest Expense,false,true
+1000,netsuite,Asset,Cash and Equivalents,Cash and Cash Equivalents,true,false
+1100,netsuite,Asset,Accounts Receivable,Accounts Receivable,true,false
+2000,netsuite,Liability,Accounts Payable,Accounts Payable,true,false
+3000,netsuite,Equity,Equity,Retained Earnings,true,false
+4000,netsuite,Revenue,Revenue,Revenue,false,true
+5000,netsuite,Expense,Cost of Goods Sold,Cost of Revenue,false,true
+6000,netsuite,Expense,Operating Expenses,Operating Expenses,false,true

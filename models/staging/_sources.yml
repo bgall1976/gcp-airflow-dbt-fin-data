@@ -1,0 +1,145 @@
+version: 2
+
+sources:
+  - name: quickbooks
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw_quickbooks
+    description: "QuickBooks Online accounting data"
+    loader: python_extractor
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 12, period: hour}
+      error_after: {count: 24, period: hour}
+    tables:
+      - name: accounts
+        description: "Chart of accounts from QuickBooks"
+        columns:
+          - name: id
+            description: "QuickBooks account ID"
+            tests:
+              - not_null
+              - unique
+      - name: invoices
+        description: "Customer invoices"
+        columns:
+          - name: id
+            tests:
+              - not_null
+              - unique
+      - name: invoice_lines
+        description: "Invoice line items"
+      - name: bills
+        description: "Vendor bills"
+        columns:
+          - name: id
+            tests:
+              - not_null
+              - unique
+      - name: payments
+        description: "Received payments"
+        columns:
+          - name: id
+            tests:
+              - not_null
+              - unique
+      - name: journal_entries
+        description: "Manual journal entries"
+      - name: customers
+        description: "Customer records"
+      - name: vendors
+        description: "Vendor records"
+
+  - name: stripe
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw_stripe
+    description: "Stripe payment processing data"
+    loader: python_extractor
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 6, period: hour}
+      error_after: {count: 12, period: hour}
+    tables:
+      - name: charges
+        description: "Stripe charges"
+        columns:
+          - name: id
+            tests:
+              - not_null
+              - unique
+      - name: refunds
+        description: "Stripe refunds"
+      - name: payouts
+        description: "Payouts to bank account"
+      - name: customers
+        description: "Stripe customer records"
+      - name: subscriptions
+        description: "Active and historical subscriptions"
+      - name: invoices
+        description: "Stripe-generated invoices"
+      - name: balance_transactions
+        description: "Balance transaction ledger"
+
+  - name: netsuite
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw_netsuite
+    description: "NetSuite ERP financial data"
+    loader: python_extractor
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 12, period: hour}
+      error_after: {count: 24, period: hour}
+    tables:
+      - name: transactions
+        description: "All NetSuite transactions"
+      - name: transaction_lines
+        description: "Transaction line details"
+      - name: accounts
+        description: "Chart of accounts"
+      - name: vendors
+        description: "Vendor master"
+      - name: customers
+        description: "Customer master"
+      - name: subsidiaries
+        description: "Company subsidiaries"
+      - name: departments
+        description: "Department hierarchy"
+      - name: currencies
+        description: "Currency exchange rates"
+
+  - name: plaid
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw_plaid
+    description: "Plaid banking data"
+    loader: python_extractor
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 24, period: hour}
+      error_after: {count: 48, period: hour}
+    tables:
+      - name: transactions
+        description: "Bank transactions"
+      - name: accounts
+        description: "Connected bank accounts"
+      - name: balances
+        description: "Daily account balances"
+
+  - name: salesforce
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw_salesforce
+    description: "Salesforce CRM revenue data"
+    loader: python_extractor
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: {count: 12, period: hour}
+      error_after: {count: 24, period: hour}
+    tables:
+      - name: opportunities
+        description: "Sales opportunities"
+      - name: opportunity_line_items
+        description: "Opportunity products/line items"
+      - name: accounts
+        description: "Salesforce accounts (companies)"
+      - name: contacts
+        description: "Contact records"
+      - name: contracts
+        description: "Active contracts"
