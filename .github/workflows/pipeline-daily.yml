@@ -1,8 +1,6 @@
 name: "Pipeline: Full Daily Run"
 
 on:
-  schedule:
-    - cron: '0 6 * * *'   # 6 AM UTC daily
   workflow_dispatch:
 
 permissions:
