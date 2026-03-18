@@ -1,12 +1,12 @@
 name: "Deploy: Infrastructure (Terraform)"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'terraform/**'
-      - '.github/workflows/deploy-infra.yml'
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only — disabled automatic deployment
+  # To re-enable automatic deployment, replace workflow_dispatch with:
+  # push:
+  #   branches:
+  #     - main
+  #     - dev
 
 permissions:
   contents: read
