@@ -1,11 +1,12 @@
 name: "Deploy: dbt Build (Production)"
 
 on:
-  workflow_dispatch:
-
-  # Daily scheduled run after extractors have finished
-  schedule:
-    - cron: '0 7 * * *'   # 7 AM UTC, after 6 AM extraction
+  workflow_dispatch:  # Manual trigger only — disabled automatic deployment
+  # To re-enable automatic deployment, replace workflow_dispatch with:
+  # push:
+  #   branches:
+  #     - main
+  #     - dev
 
   workflow_dispatch:
     inputs:
