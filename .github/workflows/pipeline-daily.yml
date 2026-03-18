@@ -1,7 +1,12 @@
 name: "Pipeline: Full Daily Run"
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only — disabled automatic deployment
+  # To re-enable automatic deployment, replace workflow_dispatch with:
+  # push:
+  #   branches:
+  #     - main
+  #     - dev
 
 permissions:
   contents: read
