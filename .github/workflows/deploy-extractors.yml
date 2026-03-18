@@ -4,13 +4,12 @@ name: "Deploy: Extractors (Cloud Run Jobs)"
 # QuickBooks, Stripe, and Salesforce are managed by Fivetran.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'extractors/**'
-      - 'Dockerfile.extractors'
-      - '.github/workflows/deploy-extractors.yml'
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only — disabled automatic deployment
+  # To re-enable automatic deployment, replace workflow_dispatch with:
+  # push:
+  #   branches:
+  #     - main
+  #     - dev
 
 permissions:
   contents: read
