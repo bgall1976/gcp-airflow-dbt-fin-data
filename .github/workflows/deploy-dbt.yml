@@ -1,16 +1,7 @@
 name: "Deploy: dbt Build (Production)"
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'models/**'
-      - 'macros/**'
-      - 'seeds/**'
-      - 'snapshots/**'
-      - 'dbt_project.yml'
-      - 'Dockerfile.dbt'
-      - '.github/workflows/deploy-dbt.yml'
+  workflow_dispatch:
 
   # Daily scheduled run after extractors have finished
   schedule:
